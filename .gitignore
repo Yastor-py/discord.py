@@ -2,4 +2,5 @@
 #.db-journal
 __pycache__
 token.0
+.vscode
 #.vscode
