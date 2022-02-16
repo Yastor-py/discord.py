@@ -6,24 +6,56 @@ from discord import Intents
 from discord.ext.commands import CommandNotFound
 from ..db import db
 from apscheduler.triggers.cron import CronTrigger
+from glob import glob
+from asyncio import sleep
 
 
 PREFIX = "<>"
 OWNER_IDS = [279958685378150400]
+COGS = [path.split("\\")[-1][:-3] for path in glob("./libs/cogs/*.py")]
+
+
+
+class Ready(object):
+    def __init__(self):
+        for cog in COGS:
+            setattr(self, cog, False)
+
+
+    def ready_up(self, cog):
+        setattr(self, cog, True)
+        print(f"{cog} cog ready")
+
+
+    def all_ready(self):
+        return all([getattr(self,cog) for cog in COGS])
+        
 
 
 class Bot(BotBase):
     def __init__(self):
         self.PREFIX = PREFIX
         self.ready = False
+        self.cogs_ready = Ready()
         self.guild = None
         self.scheduler = AsyncIOScheduler()
 
         db.autosave(self.scheduler)
         super().__init__(command_prefix=PREFIX, owner_ids= OWNER_IDS, Intents = Intents.all())
 
+    def setup(self):
+        for cog in COGS:
+            self.load_extension(f"libs.cogs.{cog}")
+            print(f"cog {cog} loaded")
+        print("setup complete")
+
+
     def run(self, version):
         self.VERSION = version
+
+        print("running setup...")
+        
+        self.setup()
 
         with open("./libs/bot/token.0", "r", encoding="utf-8") as tf:
             self.TOKEN = tf.read()
@@ -67,21 +99,29 @@ class Bot(BotBase):
 
     async def on_ready(self):
         if not self.ready:
-            self.ready = True
-            self.scheduler.start()
             
-            #self.scheduler.add_job(self.print_message, 'interval', seconds=5) #print message every 15s CronTrigger(second="0,15,30,45")
+            self.scheduler.start()
 
+            #self.scheduler.add_job(self.print_message, 'interval', seconds=5) #print message every 15s CronTrigger(second="0,15,30,45")
+            self.stdout = self.get_channel(852961240350457866)
+            while not self.cogs_ready.all_ready():
+                print("waiting...")
+                await sleep(0.5)
+
+            
+            self.ready = True
             print("Bot ready")
 
-            print("\nList of the servers where the bot is: \n")
-            for guild in bot.guilds: #on what servers bot is
-                print(guild.name)
+            # print("\nList of the servers where the bot is: \n")
+            # for guild in bot.guilds: #on what servers bot is
+            #     print(guild.name)
 
             self.guild = bot.guilds[1] #get guild of the 2nd server 
+            
 
-            channel = self.get_channel(852961240350457866)
-            await channel.send("Now online!")
+
+            
+            await self.stdout.send("Now online!")
 
             # embed = Embed(title="Now online!", description="Oiw is now online!", color=0xCC0000, timestamp=datetime.utcnow())
             # fields = [("Name", "Value", True),
